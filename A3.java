@@ -39,13 +39,22 @@ throws SQLException {
         stmt2.setInt(2, row);
         stmt2.setInt(3, col);
         ResultSet getValue = stmt2.executeQuery();
-        int value = getValue.getInt(4); // get the forth component of ResultSet 
+        int value = 0;
+        if (getValue.next()) {
+            // if data exist: 
+            value = getValue.getInt(4); // get the forth component of ResultSet 
+
+        }
         System.out.println(value);
     }
 };
 
 public static void SETV(int id, int row, int col, int val, Connection con) 
 throws SQLException {
+System.out.println("setValue_begin");
+//System.out.println(id); 
+System.out.println(row); 
+System.out.println(col); 
     // step 1: select from tabel MATRIX of matrix id, row_dim, col_dim
     String query1 = "SELECT * FROM MATRIX WHERE MATRIX_ID = ?";
     PreparedStatement stmt1 = con.prepareStatement(query1);
@@ -59,28 +68,45 @@ throws SQLException {
         row_dim = getMatrix.getInt(2);
         col_dim = getMatrix.getInt(3);
         exist_matrix = true;
-    }
-
+System.out.println("setValue_while");  
+System.out.println(row_dim);
+System.out.println(col_dim); 
+    };
+    
     // step 2: if inquiry matrix exists, and row and col is valid, then modify 
     // corresponding value from table MATRIX_DATA
-    if ((exist_matrix == true) && (row <= row_dim) && (col <= col_dim)) {
-        String query2 = "UPDATE MATRIX_DATA " + 
-            "SET VALUE = ? " +
-            "WHERE MATRIX_ID = ? AND ROW_NUM = ? AND COL_NUM = ?";
+    if (exist_matrix && (row <= row_dim) && (col <= col_dim)) {
+System.out.println("setValue_mid");
+        // Step 2.1: decide if the entry we want to set is already exist:
+        String query2 = "SELECT * FROM MATRIX_DATA WHERE MATRIX_ID = ? AND " + 
+            "ROW_NUM = ? AND COL_NUM = ?";
         PreparedStatement stmt2 = con.prepareStatement(query2);
-        stmt2.setInt(1, val);  
-        stmt2.setInt(2, id);  
-        stmt2.setInt(3, row);  
-        stmt2.setInt(4, col);  
-        stmt2.executeUpdate(); // no return value for executeUpdate()
+        stmt2.setInt(1, id);  
+        stmt2.setInt(2, row);  
+        stmt2.setInt(3, col);  
+        ResultSet checkExist = stmt2.executeQuery();
+        if (checkExist.next()) {
+            // S2.2: if the corresponding entry of the matrix exist, then we modify it
+            String query3 = "UPDATE MATRIX_DATA " + 
+            "SET VALUE = ? " +
+            "WHERE (MATRIX_ID = ?) AND (ROW_NUM = ?) AND (COL_NUM = ?)";
+            PreparedStatement stmt3 = con.prepareStatement(query2);
+            stmt3.setInt(1, val);  
+            stmt3.setInt(2, id);  
+            stmt3.setInt(3, row);  
+            stmt3.setInt(4, col);  
+            stmt3.executeUpdate(); // no return value for executeUpdate()
+        } else {
+            // S2.3: otherwise we need to insert a new record for that entry of matrix
+            
     }
 
 };
 
-public static void DELETEALL(Connection con) {
+public static void DELETEALL(Connection con) throws SQLException {
     // delete all records from table MATRIX, delete all records from table MATRIX_DATA
-    String query1 = "DELETE * FROM MATRIX;"
-    String query2 = "DELETE * FROM MATRIX_DATA;"
+    String query1 = "DELETE FROM MATRIX;";
+    String query2 = "DELETE FROM MATRIX_DATA;";
     PreparedStatement stmt1 = con.prepareStatement(query1);
     PreparedStatement stmt2 = con.prepareStatement(query2);
     stmt1.executeUpdate();
@@ -88,10 +114,10 @@ public static void DELETEALL(Connection con) {
 
 };
 
-public static void DELETE(int id, Connection con) {
+public static void DELETE(int id, Connection con) throws SQLException {
     // delete indicated record from MATRIX, delete corresponding records from table MATRIX_DATA
-    String query1 = "DELETE * FROM MATRIX WHERE MATRIX_ID = ?;"
-    String query2 = "DELETE * FROM MATRIX_DATA WHERE MATRIX_ID = ?;"
+    String query1 = "DELETE * FROM MATRIX WHERE MATRIX_ID = ?;";
+    String query2 = "DELETE * FROM MATRIX_DATA WHERE MATRIX_ID = ?;";
     PreparedStatement stmt1 = con.prepareStatement(query1);
     PreparedStatement stmt2 = con.prepareStatement(query2);
     stmt1.setInt(1, id);
@@ -103,29 +129,35 @@ public static void DELETE(int id, Connection con) {
 public static void SETM(int id, int row_dim, int col_dim, Connection con) 
 throws SQLException {
 //System.out.println("stem");
-    
+//System.out.println(row_dim);
+//System.out.println(col_dim); 
     String query1 = "SELECT * FROM MATRIX WHERE MATRIX_ID = ?";
     PreparedStatement stmt1 = con.prepareStatement(query1);
     stmt1.setInt(1, id); 
     ResultSet checkExist = stmt1.executeQuery();
     if (checkExist.next()) {
         // if the matrix exist: check if we can modify it safely: 
-        row_d = checkExist.getInt(2);
-        col_d = checkExist.getInt(3);
+        int row_d = checkExist.getInt(2);
+        int col_d = checkExist.getInt(3);
+//System.out.println(row_d);
+//System.out.println(col_d);         
         if ((row_dim >= row_d) && (col_dim >= col_d)) {
+System.out.println("setm_modify");
             String query2 = "UPDATE MATRIX " + 
-                    "SET ROW_DIM = ? AND COL_DIM = ? " +
+                    "SET ROW_DIM = ?, COL_DIM = ? " +
                     "WHERE MATRIX_ID = ?";
             PreparedStatement stmt2 = con.prepareStatement(query2);
             stmt2.setInt(1, row_dim);  
             stmt2.setInt(2, col_dim);  
             stmt2.setInt(3, id);  
             stmt2.executeUpdate(); 
-        } else if {
+        } else {
+System.out.println("setm_lol");       
             // check if we can shrink matrix without losing information: 
             // TO BE CONT: 
         }
     } else {  // if the matrix doesn't exist: add new matrix into table MATRIX:
+System.out.println("setm_createnew");
         String query = "INSERT INTO MATRIX VALUES (?, ?, ?)";
         PreparedStatement stmt = con.prepareStatement(query);
         stmt.setInt(1, id);
@@ -136,14 +168,32 @@ throws SQLException {
 };
 
 public static void ADD(int id1, int id2, int id3, Connection con) throws SQLException {
-    String query1 = "DELETE * FROM MATRIX WHERE MATRIX_ID = ?;"
-    String query2 = "DELETE * FROM MATRIX_DATA WHERE MATRIX_ID = ?;"
+    String query1 = "SELECT * FROM MATRIX WHERE MATRIX_ID = ?;";
+    String query2 = "SELECT * FROM MATRIX WHERE MATRIX_ID = ?;";
     PreparedStatement stmt1 = con.prepareStatement(query1);
     PreparedStatement stmt2 = con.prepareStatement(query2);
-    stmt1.setInt(1, id);
-    stmt2.setInt(1, id);
-    stmt1.executeUpdate();
-    stmt2.executeUpdate();
+    stmt1.setInt(1, id2);
+    stmt2.setInt(1, id3);
+    ResultSet getMatrix1 = stmt1.executeQuery();
+    ResultSet getMatrix2 = stmt2.executeQuery();
+    // to simplify, I assume there exist such matrix
+    //      can check existence with getMatrix.next()
+    int row_dim_1 = getMatrix1.getInt(2);
+    int col_dim_1 = getMatrix1.getInt(3);
+    int row_dim_2 = getMatrix2.getInt(2);
+    int col_dim_2 = getMatrix2.getInt(3);
+    if ((row_dim_1 == row_dim_2) && (col_dim_1 == col_dim_2)) {
+        // two matrics have same dimension, addition is valid: 
+        String query3 = "SELECT * FROM MATRIX_DATA WHERE MATRIX_ID = ?;";
+        String query4 = "SELECT * FROM MATRIX_DATA WHERE MATRIX_ID = ?;";
+        PreparedStatement stmt3 = con.prepareStatement(query3);
+        PreparedStatement stmt4 = con.prepareStatement(query4);
+        stmt3.setInt(1, id2);
+        stmt4.setInt(1, id3);
+        ResultSet getValue1 = stmt3.executeQuery();
+        ResultSet getValue2 = stmt4.executeQuery();
+
+    }
 };
 
 public static void main(String[] args) throws                                       
@@ -195,7 +245,7 @@ System.out.println(cmd);
             String sid = sc.next();
             if (sid.equals("ALL")) {
                 DELETEALL(con);
-            } else if {
+            } else {
                 int id = Integer.parseInt(sid);
                 DELETE(id, con);
             }
