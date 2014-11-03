@@ -154,12 +154,10 @@ throws SQLException {
             stmt2.setInt(3, id);  
             stmt2.executeUpdate(); 
         } else {
-//System.out.println("setm_lol");       
             // check if we can shrink matrix without losing information: 
             // TO BE CONT: 
         }
     } else {  // if the matrix doesn't exist: add new matrix into table MATRIX:
-//System.out.println("setm_createnew");
         String query = "INSERT INTO MATRIX VALUES (?, ?, ?)";
         PreparedStatement stmt = con.prepareStatement(query);
         stmt.setInt(1, id);
@@ -169,19 +167,54 @@ throws SQLException {
     }
 };
 
-public static int PREPARE_MATRIX(int id1, Connection con) throws SQLException {
-// helper function: check if matrix=id1 exist, if yes, delete it and all associated values
-// create a new matrix with correct dimension with respect to id2
+public static void COPY_MATRIX(int id1, int id2, Connection con) throws SQLException {
+// helper function: copy the matrix=id2 into matrix=id1:
+// check if id1 already exist, if yes, delete all content 
+// then createa new id1 with same dimension of id2:
+// id2 is not allow to equal to id1
     String query1 = "SELECT * FROM MATRIX WHERE MATRIX_ID = ?;";
     PreparedStatement stmt1 = con.prepareStatement(query1);
     stmt1.setInt(1, id1);
-    int exist = 0;
     ResultSet getMatrix1 = stmt1.executeQuery();
     if (getMatrix1.next()) {
-        exist = 1;
         DELETE(id1, con); // if such matrix, delete it and its data
     };
-    return exist;
+    String query2 = "SELECT * FROM MATRIX WHERE MATRIX_ID = ?;";
+    PreparedStatement stmt2 = con.prepareStatement(query2);
+    stmt2.setInt(1, id2);
+    ResultSet getMatrix2 = stmt2.executeQuery();
+    if (getMatrix2.next()) {
+        int row_dim = getMatrix2.getInt(2);   
+        int col_dim = getMatrix2.getInt(3);
+        // create a new matrix = id1:
+        // copy the framework of id2 into id1:
+        query2 = "INSERT INTO MATRIX VALUES (?, ?, ?);";
+        stmt2 = con.prepareStatement(query2);
+        stmt2.setInt(1, id1);
+        stmt2.setInt(2, row_dim);
+        stmt2.setInt(3, col_dim);
+        stmt2.executeUpdate();    
+        // copy the content of id2 into id1: 
+        String query3 = "SELECT * FROM MATRIX_DATA WHERE MATRIX_ID = ?;";
+        PreparedStatement stmt3 = con.prepareStatement(query3);
+        stmt3.setInt(1, id2);
+        ResultSet getValue = stmt3.executeQuery();
+        while (getValue.next()) {
+            int row_num = getValue.getInt(2);
+            int col_num = getValue.getInt(3);
+            float val = getValue.getFloat(4);
+            String query7 = "INSERT INTO MATRIX_DATA VALUES (?, ?, ?, ?);";
+            PreparedStatement stmt7 = con.prepareStatement(query7);
+            stmt7.setInt(1, id1); // put summing result into matrix=id1
+            stmt7.setInt(2, row_num);
+            stmt7.setInt(3, col_num);
+            stmt7.setFloat(4, val);
+            stmt7.executeUpdate();
+        }
+    } /*else {
+        System.out.println("Error: No matrix==id2 exist."); 
+    } */
+
 };
 
 
@@ -206,17 +239,16 @@ public static void ADD(int id1, int id2, int id3, Connection con) throws SQLExce
         int col_dim_2 = getMatrix2.getInt(3);
         if ((row_dim_1 == row_dim_2) && (col_dim_1 == col_dim_2)) {
         // two matrics have same dimension, addition is valid: 
-            int exist = PREPARE_MATRIX(id1, con); // check if matrix1 exist or not, if yes, delete the old matrix1
-            // create a new matrix1 with same dimension of id2;
+            // create a new matrix with id=100000 and use it as temp storage: 
             String query0 = "INSERT INTO MATRIX VALUES (?, ?, ?);";
+            int id0 = 100000;
             PreparedStatement stmt0 = con.prepareStatement(query0);
-            stmt0.setInt(1, id1);
+            stmt0.setInt(1, id0);
             stmt0.setInt(2, row_dim_1);
             stmt0.setInt(3, col_dim_1);
             stmt0.executeUpdate();     
 
             for (int i=1; i<=row_dim_1; ++i) { // start from row 1 not row 0
-//System.out.println("add_for_begin");  
                 String query3 = "SELECT * FROM MATRIX_DATA WHERE MATRIX_ID = ? AND " + 
                     "ROW_NUM = ?;";
                 String query4 = "SELECT * FROM MATRIX_DATA WHERE MATRIX_ID = ? AND " +
@@ -231,7 +263,6 @@ public static void ADD(int id1, int id2, int id3, Connection con) throws SQLExce
                 ResultSet getValue1 = stmt3.executeQuery();
                 ResultSet getValue2 = stmt4.executeQuery();
                 while (getValue1.next()) {
-//System.out.println("add_add_mx1"); 
                     int row_num = getValue1.getInt(2); // actually row_num = i
 //System.out.println(row_num == i);   // testing purpose
                     int col_num = getValue1.getInt(3);
@@ -240,21 +271,20 @@ public static void ADD(int id1, int id2, int id3, Connection con) throws SQLExce
                     // may need to check if id1 already contains data in it. 
                     String query5 = "INSERT INTO MATRIX_DATA VALUES (?, ?, ?, ?);";
                     PreparedStatement stmt5 = con.prepareStatement(query5);
-                    stmt5.setInt(1, id1); // put summing result into matrix=id1
+                    stmt5.setInt(1, id0); // put summing result into matrix=id1
                     stmt5.setInt(2, row_num);
                     stmt5.setInt(3, col_num);
                     stmt5.setFloat(4, val);
                     stmt5.executeUpdate();
                 }
                 while(getValue2.next()) {
-//System.out.println("add_add_mx2");             
                     int row_num = getValue2.getInt(2); // actually row_num = i
                     int col_num = getValue2.getInt(3);
                     float val = getValue2.getInt(4);
                     String query6 = "SELECT * FROM MATRIX_DATA WHERE (MATRIX_ID = ?) " +
                         "AND (ROW_NUM = ?) AND (COL_NUM = ?);";
                     PreparedStatement stmt6 = con.prepareStatement(query6);
-                    stmt6.setInt(1, id1); // extract the previous value in matrix=id1
+                    stmt6.setInt(1, id0); // extract the previous value in matrix=id1
                     stmt6.setInt(2, row_num);
                     stmt6.setInt(3, col_num);
                     ResultSet getOldValue = stmt6.executeQuery();
@@ -269,7 +299,7 @@ public static void ADD(int id1, int id2, int id3, Connection con) throws SQLExce
                         "WHERE (MATRIX_ID = ?) AND (ROW_NUM = ?) AND (COL_NUM = ?)";
                         PreparedStatement stmt7 = con.prepareStatement(query7);
                         stmt7.setFloat(1, val);
-                        stmt7.setInt(2, id1); // put summing result into matrix=id1
+                        stmt7.setInt(2, id0); // put summing result into matrix=id1
                         stmt7.setInt(3, row_num);
                         stmt7.setInt(4, col_num);
                         stmt7.executeUpdate();
@@ -277,14 +307,16 @@ public static void ADD(int id1, int id2, int id3, Connection con) throws SQLExce
                         // current index don't have value, put new value into it
                         String query7 = "INSERT INTO MATRIX_DATA VALUES (?, ?, ?, ?);";
                         PreparedStatement stmt7 = con.prepareStatement(query7);
-                        stmt7.setInt(1, id1); // put summing result into matrix=id1
+                        stmt7.setInt(1, id0); // put summing result into matrix=id1
                         stmt7.setInt(2, row_num);
                         stmt7.setInt(3, col_num);
                         stmt7.setFloat(4, val);
                         stmt7.executeUpdate();
                     }
                 }
-            } 
+            }
+            // copy the matrix=id0 into matrix of id1: 
+            COPY_MATRIX(id1, id0, con); 
         } else {
             System.out.println("Error: Dimension mismatch.");
         } 
@@ -293,9 +325,80 @@ public static void ADD(int id1, int id2, int id3, Connection con) throws SQLExce
     }
 };
 
-public static void MULT(int id1, int id2, int id3) {
+
+public static void MULT(int id1, int id2, int id3, Connection con) throws SQLException {
 // multiply matrix2 and matrix3, store the result in matrix1 
+    String query1 = "SELECT * FROM MATRIX WHERE MATRIX_ID = ?;";
+    String query2 = "SELECT * FROM MATRIX WHERE MATRIX_ID = ?;";
+    PreparedStatement stmt1 = con.prepareStatement(query1);
+    PreparedStatement stmt2 = con.prepareStatement(query2); 
+    stmt1.setInt(1, id2);
+    stmt2.setInt(1, id3);
+    ResultSet getMatrix1 = stmt1.executeQuery();
+    ResultSet getMatrix2 = stmt2.executeQuery();
+
+    if (getMatrix1.next() && getMatrix2.next()) {
+        // if both matrics exists: 
+        // Note: It's important to use .next() to move cursor to the first line of ResultSet
+        int row_dim_1 = getMatrix1.getInt(2);   
+        int col_dim_1 = getMatrix1.getInt(3);
+        int row_dim_2 = getMatrix2.getInt(2);
+        int col_dim_2 = getMatrix2.getInt(3);
+
+        if (col_dim_1 == row_dim_2) {
+            // if the multiplication is valid in dimension:
+            // create a new matrix with id=100000 and use it as temp storage: 
+            String query0 = "INSERT INTO MATRIX VALUES (?, ?, ?);";
+            int id0 = 100000;
+            PreparedStatement stmt0 = con.prepareStatement(query0);
+            stmt0.setInt(1, id0);
+            stmt0.setInt(2, row_dim_1);
+            stmt0.setInt(3, col_dim_2);
+            stmt0.executeUpdate();     
+ 
+            for (int i=1; i<=row_dim_1; ++i) {
+                String query3 = "SELECT * FROM MATRIX_DATA WHERE MATRIX_ID = ? AND " + 
+                    "ROW_NUM = ?;";
+                PreparedStatement stmt3 = con.prepareStatement(query3);
+                stmt3.setInt(1, id2);
+                stmt3.setInt(2, i);
+                ResultSet getValue1 = stmt3.executeQuery();
+                for (int j=0; j<=col_dim_2; ++j) {
+                    float res = 0; // this used to keep the final value of index (i,j)
+                    while(getValue1.next()) {
+                        int col_1 = getValue1.getInt(3);
+                        float val_1 = getValue1.getInt(4);
+                        String query4 = "SELECT * FROM MATRIX_DATA WHERE MATRIX_ID = ? " + 
+                        "AND COL_NUM = ? AND ROW_NUM = ?;";
+                        PreparedStatement stmt4 = con.prepareStatement(query4);
+                        stmt4.setInt(1, id2);
+                        stmt4.setInt(2, j);
+                        stmt4.setInt(3, col_1);
+                        ResultSet getValue2 = stmt4.executeQuery();
+                        while (getValue2.next()) {
+                            float val_2 = getValue2.getInt(4);
+                            res = res + val_1*val_2;
+                        }
+                    }
+                    // check if res == 0; if yes, do nothing; otherwise
+                    // insert the result for index (i,j)
+                    if (res != 0) {
+                        String query5 = "INSERT INTO MATRIX_DATA VALUES (?, ?, ?, ?);";
+                        PreparedStatement stmt5 = con.prepareStatement(query5);
+                        stmt5.setInt(1, id1); // put result into matrix=id1
+                        stmt5.setInt(2, i); // put the result into index (i,j)
+                        stmt5.setInt(3, j); 
+                        stmt5.setFloat(4, res);
+                        stmt5.executeUpdate();
+                    }
+                }
+            } 
+            // copy the matrix=id0 into matrix of id1: 
+            COPY_MATRIX(id1, id0, con);            
+        }
+    }
 };
+
 
 public static void TRANS(int id1, int id2, Connection con) throws SQLException {
 // transpose matrix2, store the result as matrix1
@@ -306,16 +409,16 @@ public static void TRANS(int id1, int id2, Connection con) throws SQLException {
     ResultSet getMatrix = stmt1.executeQuery();
     if (getMatrix.next()) {
         // if the selected matrix exist:
-        int exist = PREPARE_MATRIX(id1, con); // check if matrix=id1 exist or not, if yes, delete the old matrix1
-            // create a new matrix=id1 with same dimension of id2;
+        // create a new matrix with id=100000 and use it as temp storage: 
         int row_dim = getMatrix.getInt(2); 
         int col_dim = getMatrix.getInt(3);
         String query0 = "INSERT INTO MATRIX VALUES (?, ?, ?);";
+        int id0 = 100000;
         PreparedStatement stmt0 = con.prepareStatement(query0);
-        stmt0.setInt(1, id1);
-        stmt0.setInt(2, col_dim); // exchange the row and matrix dimension. 
+        stmt0.setInt(1, id0);
+        stmt0.setInt(2, col_dim);
         stmt0.setInt(3, row_dim);
-        stmt0.executeUpdate();     
+        stmt0.executeUpdate();      
         
         for (int i=1; i<=row_dim; ++i) {
             String query2 = "SELECT * FROM MATRIX_DATA WHERE MATRIX_ID = ? AND " + 
@@ -337,6 +440,9 @@ public static void TRANS(int id1, int id2, Connection con) throws SQLException {
                 stmt3.executeUpdate();
             };
         };
+        // copy the matrix=id0 into matrix of id1: 
+        COPY_MATRIX(id1, id0, con);  
+
     } else {
         System.out.println("Error: selected matrix doesn't exist.");
     };
@@ -351,6 +457,17 @@ public static void NEG(int id1, int id2, Connection con) throws SQLException {
     if (getMatrix.next()) {
         // if the selected matrix exist:
         int row_dim = getMatrix.getInt(2); 
+        int col_dim = getMatrix.getInt(3);
+        
+        // create a new matrix with id=100000 and use it as temp storage: 
+        String query0 = "INSERT INTO MATRIX VALUES (?, ?, ?);";
+        int id0 = 100000;
+        PreparedStatement stmt0 = con.prepareStatement(query0);
+        stmt0.setInt(1, id0);
+        stmt0.setInt(2, row_dim);
+        stmt0.setInt(3, col_dim);
+        stmt0.executeUpdate();         
+
         for (int i=1; i<=row_dim; ++i) {
             String query2 = "SELECT * FROM MATRIX_DATA WHERE MATRIX_ID = ? AND " + 
                     "ROW_NUM = ?;";
@@ -370,7 +487,10 @@ public static void NEG(int id1, int id2, Connection con) throws SQLException {
                 stmt3.setFloat(4, val);
                 stmt3.executeUpdate();
             };
-        };
+        }
+        // copy the matrix=id0 into matrix of id1: 
+        COPY_MATRIX(id1, id0, con);  
+
     } else {
         System.out.println("Error: selected matrix doesn't exist.");
     };
@@ -440,7 +560,7 @@ ClassNotFoundException, SQLException, FileNotFoundException, NoSuchElementExcept
             int id1 = Integer.parseInt(sid1);
             int id2 = Integer.parseInt(sid2);
             int id3 = Integer.parseInt(sid3);
-            int temp = id1 + id2 + id3; // pick a number not id1,id2,id3
+            int temp = 100001; // pick a number for temporary storage
             NEG(temp, id3, con);
             ADD(id1, id2, temp, con);
             DELETE(temp, con);
@@ -451,7 +571,7 @@ ClassNotFoundException, SQLException, FileNotFoundException, NoSuchElementExcept
             int id1 = Integer.parseInt(sid1);
             int id2 = Integer.parseInt(sid2);
             int id3 = Integer.parseInt(sid3);
-            MULT(id1, id2, id3);
+            MULT(id1, id2, id3, con);
         } else if (cmd.equals("TRANSPOSE")) {
             String sid1 = sc.next();
             String sid2 = sc.next();

@@ -1,0 +1,12 @@
+1. need to do:
+	 ADD 2 2 2
+
+
+2. allow to SETV 0
+	// delete the record that set to 0
+
+3. check float point support for some function
+
+4. cannot have a matrix with 0 row or 9 col
+	// index starts from 1
+
